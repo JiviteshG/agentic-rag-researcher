@@ -1,57 +1,68 @@
 # app/ingestion/embeddings.py
 """
-OpenAI embedding utilities for generating embeddings without downloading models.
+OpenAI embedding utilities with safety guards for empty inputs.
 """
 
 import os
+import time
 from typing import List
-import requests
 import numpy as np
-
+from openai import OpenAI, RateLimitError
 
 def get_openai_embeddings(texts: List[str], model: str = "text-embedding-3-small") -> np.ndarray:
     """
-    Get embeddings from OpenAI API for a list of texts.
-    
-    Args:
-        texts: List of text strings to embed
-        model: OpenAI embedding model name (default: text-embedding-3-small)
-    
-    Returns:
-        numpy array of shape (len(texts), embedding_dim)
+    Get embeddings from OpenAI API with guards for empty strings and rate limits.
     """
+    # 1. Guard against empty input list
+    if not texts:
+        return np.array([], dtype=np.float32)
+
     api_key = os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set in the environment.")
-    
-    base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    url = f"{base_url}/embeddings"
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    
-    # OpenAI embeddings API accepts up to 2048 inputs per request
-    # We'll batch if needed
+
+    client = OpenAI(api_key=api_key, base_url=base_url)
     all_embeddings = []
-    batch_size = 100  # Process in batches to avoid rate limits
+    batch_size = 20 
     
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
         
-        payload = {
-            "model": model,
-            "input": batch,
-        }
+        # 2. Clean the batch: Replace empty strings with a single space " " 
+        # OpenAI cannot embed a completely empty string "".
+        safe_batch = [t if t.strip() else " " for t in batch]
         
-        resp = requests.post(url, json=payload, headers=headers, timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
-        
-        # Extract embeddings from response
-        batch_embeddings = [item["embedding"] for item in data["data"]]
-        all_embeddings.extend(batch_embeddings)
-    
-    return np.array(all_embeddings, dtype=np.float32)
+        try:
+            response = client.embeddings.create(
+                input=safe_batch,
+                model=model
+            )
+            
+            # Extract and verify we actually got data back
+            if not response.data:
+                continue
+                
+            batch_embeddings = [item.embedding for item in response.data]
+            all_embeddings.extend(batch_embeddings)
+            
+            time.sleep(0.5) # Gentle throttling
+            
+        except RateLimitError:
+            print("Rate limit hit. Sleeping for 10s...")
+            time.sleep(10)
+            # Retry this batch by adjusting the loop index
+            i -= batch_size 
+            continue
+        except Exception as e:
+            print(f"Unexpected error during embedding: {e}")
+            raise
 
+    # 3. Final check before conversion to avoid the Axis 0 error
+    if not all_embeddings:
+        # Return an empty 2D array compatible with vector store shapes
+        # Assuming model dimension is 1536 for text-embedding-3-small
+        return np.empty((0, 1536), dtype=np.float32)
+
+    return np.array(all_embeddings, dtype=np.float32)

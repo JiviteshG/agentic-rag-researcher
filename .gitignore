@@ -1,101 +1,47 @@
-# Python
+# === CRITICAL: SECRETS & KEYS ===
+.env
+.env.*
+!.env.example
+credentials.json
+client_secret*.json
+*.pem
+*.key
+
+# === PACKAGE MANAGER (uv & python) ===
+.venv/
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+.python-version
+# Keep uv.lock and pyproject.toml as they are vital for others to run your code
 
-# Virtual environments
-.venv/
-venv/
-ENV/
-env/
-.venvs/
-
-# Hugging Face cache
-hf_cache/
-.cache/
-huggingface/
-transformers_cache/
-
-# Model files (large files - should not be in git)
-*.bin
-*.safetensors
-*.pt
-*.pth
-*.pkl
-*.h5
-*.ckpt
-*.model
-*.onnx
-*.pb
-*.tflite
-*.hdf5
-
-# Data files
-*.csv
-*.json
-*.parquet
-*.arrow
-*.feather
-*.pkl
-*.pickle
-data/
-datasets/
-*.db
-*.sqlite
-*.sqlite3
-
-# Weaviate data
+# === AGENTIC / RAG ARTIFACTS ===
+# Ignore local vector store persistence if you ever run Weaviate locally
 weaviate_data/
-*.db-journal
+# Ignore locally downloaded Arxiv PDFs or research papers
+data/
+downloads/
+*.pdf
+# Ignore LLM traces or agent logs
+chain_cache/
+*.log
+**/logs/
 
-# IDE
+# === IDE & TOOLS ===
 .vscode/
 .idea/
+.cursor/
 *.swp
-*.swo
-*~
 .DS_Store
+# If you use the 'uv' tool for indexing, ignore its cache
+.uv/
 
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb
-
-# Logs
-*.log
-logs/
-
-# Environment variables
-.env
-.env.local
-
-# OS
-Thumbs.db
-.DS_Store
-
-# Streamlit
-.streamlit/
-
-# Temporary files
-*.tmp
-*.temp
-tmp/
-temp/
-
-
+# === DATA & MODELS ===
+# Large files that should stay local
+*.bin
+*.safetensors
+*.onnx
+hf_cache/
+*.pkl
+*.db
+*.sqlite3
